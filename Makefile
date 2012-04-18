@@ -57,7 +57,7 @@ PROGRAMS_C=beeversion beesep beecut beeuniq beesort beegetopt
 PROGRAMS_SHELL=bee beesh beefind
 
 HELPER_BEE_SHELL=bee-init bee-check bee-remove bee-install bee-list bee-query bee-download bee-update
-HELPER_BEE_C=bee-dep
+HELPER_BEE_C=bee-dep bee-db
 
 HELPER_SHELL=compat-filesfile2contentfile filelist2content content2filelist
 
@@ -106,6 +106,9 @@ BEEUNIQ_OBJECTS=beeuniq.o
 BEESORT_OBJECTS=bee_tree.o bee_version_compare.o bee_version_output.o bee_version_parse.o bee_getopt.o beesort.o
 BEEDEP_OBJECTS=bee-dep.o graph.o hash.o beedep_tree.o node.o
 BEEGETOPT_OBJECTS=bee_getopt.o beegetopt.o
+BEEDB_OBJECTS=bee-db.o bee_db_query.o sqlite3.o
+
+BEEDB_LDFLAGS=-lpthread -ldl
 
 bee_MANPAGES=$(addprefix manpages/,${MANPAGES})
 bee_BUILDTYPES=$(addsuffix .sh,$(addprefix buildtypes/,$(BUILDTYPES)))
@@ -135,6 +138,9 @@ bee-dep: $(addprefix src/, ${BEEDEP_OBJECTS})
 
 beegetopt: $(addprefix src/, ${BEEGETOPT_OBJECTS})
 	$(call quiet-command,${CC} ${LDFLAGS} -o $@ $^,"LD	$@")
+
+bee-db: $(addprefix src/, ${BEEDB_OBJECTS})
+	$(call quiet-command,${CC} ${LDFLAGS} ${BEEDB_LDFLAGS} -o $@ $^,"LD	$@")
 
 %.o: %.c
 	$(call quiet-command,${CC} ${CFLAGS} -o $@ -c $^,"CC	$@")
