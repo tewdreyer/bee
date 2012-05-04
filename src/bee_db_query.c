@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -86,4 +87,53 @@ char *sql_insert_into_packagefile(void)
 char *sql_insert_into_filefunction(void)
 {
     return "INSERT INTO FileFunction VALUES (?, ?, ?);";
+}
+
+int sql_insert_into_packagefile_add_values(char **query, char *packagename, char *filename, char *md5sum, char *size, char *flags)
+{
+    int length = 0, addlen = 0;
+    char *start = "INSERT INTO PackageFile VALUES ";
+    char *add = NULL;
+
+    assert(query);
+    assert(package);
+    assert(filename);
+    assert(md5sum);
+    assert(size);
+    assert(flags);
+
+    addlen += 2 + 4;
+    addlen += strlen(packagename);
+    addlen += strlen(filename);
+    addlen += strlen(md5sum);
+    addlen += strlen(size);
+    addlen += strlen(flags);
+    
+    add = calloc(addlen + 1, sizeof(char));
+    if(add == NULL) {
+        fprintf(stderr, "failed to create sql string 'INSERT INTO PackageFile ..': %s\n", strerror(errno));
+        return 0;
+    }
+    
+    if((sprintf(add, "(%s,%s,%s,%s,%s)", packagename, filename, md5sum, size, flags) != addlen) {
+        fprintf(stderr, "sprintf failed: %s\n", strerror(errno));
+        return 0;	
+    }    
+    
+    if(*query) {
+    	length += strlen(*query);
+    	length += 1; /* add a comma */
+    } else {
+        length += strlen(start);
+    }	
+
+    *query = realloc(*query, (length + 1) * sizeof(char));
+    if(! *query) {
+        fprintf(stderr, "memory allocation failed: %s\n", strerror(errno));
+        return 0;
+    }
+    
+    
+    
+    return 1;
 }

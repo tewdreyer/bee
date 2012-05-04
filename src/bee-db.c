@@ -182,9 +182,7 @@ int bee_db_add_data(sqlite3 *db_handle, char *dep_file)
         ret = 0,
         db_commit = 0;
     FILE *file;
-    char *insert_pf = NULL,
-         *insert_ff = NULL,
-         *query = NULL,
+    char *query = NULL,
          line[LINE_MAX],
          filename[LINE_MAX],
          key[LINE_MAX],
@@ -197,9 +195,6 @@ int bee_db_add_data(sqlite3 *db_handle, char *dep_file)
         return 0;
     }
 
-    insert_pf = sql_insert_into_packagefile();
-    insert_ff = sql_insert_into_filefunction();
-
     sqlite3_exec(db_handle, "BEGIN", 0, 0, 0);
 
     while(no_fgets || fgets(line, LINE_MAX, file)) {
@@ -211,16 +206,8 @@ int bee_db_add_data(sqlite3 *db_handle, char *dep_file)
 
         if(filename[0] == '/') {
             type = TYPE_FILE;
-            query = insert_ff;
         } else {
             type = TYPE_PACKAGE;
-            query = insert_pf;
-        }
-
-        ret = sqlite3_prepare_v2(db_handle, query, strlen(query), &statement, &tail);
-        if(ret != SQLITE_OK) {
-            fprintf(stderr, "failed to prepare query: %s\n", sqlite3_errmsg(db_handle));
-            return 0;
         }
 
         while(fgets(line, LINE_MAX, file)) {
@@ -235,28 +222,24 @@ int bee_db_add_data(sqlite3 *db_handle, char *dep_file)
 
             sscanf(line, "%s = %s", key, value);
             if(strcmp(key, "provides") == 0) {
-            	db_commit = 1;
-                sqlite3_bind_text(statement, 1, filename, strlen(filename), NULL);
-                sqlite3_bind_text(statement, 2, value, strlen(value), NULL);
-                if(type == TYPE_FILE) {
-                    sqlite3_bind_int(statement, 3, 0);
-                } else {
-                    sqlite3_bind_text(statement, 3, "", 0, NULL);
-                    sqlite3_bind_int(statement, 4, 0);
-                    sqlite3_bind_int(statement, 5, 0);
-                }
+                sql_insert_into_packagefile_add_values(&query, filename, value, "", 0, 0);
+                
             }
             
             if(db_commit) {
+        ret = sqlite3_prepare_v2(db_handle, query, strlen(query), &statement, &tail);
+        if(ret != SQLITE_OK) {
+            fprintf(stderr, "failed to prepare query: %s\n", sqlite3_errmsg(db_handle));
+            return 0;
+        }
+
+
                 while((ret = sqlite3_step(statement)) != SQLITE_DONE) {
                     if(ret != SQLITE_ROW) {
                         fprintf(stderr, "failed to retrieve row: %s\n", sqlite3_errmsg(db_handle));
                         return 0;
                     }
                 }
-                
-                sqlite3_reset(statement);
-                sqlite3_clear_bindings(statement);
             }
         }
 
@@ -287,8 +270,13 @@ int bee_db_add_data_all(sqlite3 *db_handle)
     }
 
     while((direntry = readdir(directory)) != NULL) {
+        if(strcmp(direntry->d_name, ".") == 0
+         ||strcmp(direntry->d_name, "..") == 0)
+            continue;
+            	
+    	
         sprintf(dep_file, "%s/%s/DEPENDENCIES", bee_metadir(), direntry->d_name);
-
+        
         if(!bee_db_add_data(db_handle, dep_file))
             fprintf(stderr, "failed to add data from %s\n", dep_file);
     }
