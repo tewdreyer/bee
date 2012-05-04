@@ -1,0 +1,119 @@
+#!/bin/bash
+#
+# bee-filedb - store information about files and their related bee packages
+#
+# Copyright (C) 2009-2011
+#       Tobias Dreyer <dreyer@molgen.mpg.de>
+#       Marius Tolzmann <tolzmann@molgen.mpg.de>
+#       and other bee developers
+#
+# This file is part of bee.
+#
+# bee is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+BEE_VERSION="@BEE_VERSION@"
+
+: ${BEE_LIBEXECDIR:=@LIBEXECDIR@}
+: ${BEE_BINDIR:=@BINDIR@}
+
+. ${BEE_LIBEXECDIR}/bee/beelib.config.sh
+config_init
+config_export
+
+: ${BEEVERSION:=${BEE_BINDIR}/beeversion}
+
+BEE_FILEDB_FILE=${BEE_CACHEDIR}/bee.filedb
+BEE_FILEDB_PATTERN=${BEE_CACHEDIR}/pattern.filedb
+
+if [ ! -e "${BEE_FILEDB_FILE}" ] ; then
+    touch ${BEE_FILEDB_FILE}
+fi
+
+function add_files() {
+    local package=${1}
+    shift
+    local files=${@}
+
+    rm -f ${BEE_FILEDB_FILE}.out
+    rm -f ${BEE_FILEDB_PATTERN}
+
+    for f in ${files} ; do
+        line=$(grep "^${f}:" ${BEE_FILEDB_FILE} 2>/dev/null)
+        if [ -n "${line}" ] ; then
+            line="${line},${package}"
+        else
+            line="${f}:${package}"
+        fi
+        echo ${line} >> ${BEE_FILEDB_FILE}.out
+
+        echo "^${f}:" >> ${BEE_FILEDB_PATTERN}
+    done
+
+    grep -vf ${BEE_FILEDB_PATTERN} ${BEE_FILEDB_FILE} >> ${BEE_FILEDB_FILE}.out
+
+    mv -f ${BEE_FILEDB_FILE}  ${BEE_FILEDB_FILE}.$(date +%s)
+    mv -f ${BEE_FILEDB_FILE}.out ${BEE_FILEDB_FILE}
+}
+
+###############################################################################
+###############################################################################
+###############################################################################
+
+options=$(${BEE_BINDIR}/beegetopt --name bee-filedb \
+                 --option add/a= \
+                 --option filelist/f= \
+                 -- "$@")
+
+if [ $? != 0 ] ; then
+    usage
+    exit 1
+fi
+eval set -- "${options}"
+
+declare OPT_FILELIST=
+declare OPT_ADDPACKAGE=
+
+while true ; do
+    case "$1" in
+        --filelist)
+            OPT_FILELIST="${2}"
+            shift 2
+            ;;
+        --add)
+            OPT_ADDPACKAGE="${2}"
+            if ! ${BEEVERSION} ${OPT_ADDPACKAGE} &>/dev/null; then
+                print_error "'${OPT_ADDPACKAGE}' does not comply with bee package naming convention"
+                exit 1
+            fi
+            shift 2
+            ;;
+        --)
+            shift
+            break
+            ;;
+    esac
+done
+
+if [ -n "${OPT_FILELIST}" ] ; then
+    files=$(cat ${OPT_FILELIST})
+else
+    while read stdin_file; do
+        files="${files} ${stdin_file}"
+    done
+fi
+
+if [ -n "${OPT_ADDPACKAGE}" ] ; then
+    add_files ${OPT_ADDPACKAGE} ${files[@]}
+fi
