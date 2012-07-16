@@ -151,7 +151,7 @@ BEE_STATIC_INLINE char *_extract_pattern(struct item *item, char **dest, char *h
     char *p;
 
     p = strstr(hint, pattern);
-    if (!p)
+    if (!p && hint != item->data)
        p = strstr(item->data, pattern);
     if (!p) {
        if (failok)
